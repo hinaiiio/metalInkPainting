@@ -11,6 +11,9 @@
 		328E93072115FBB100AA5AD4 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E93062115FBB100AA5AD4 /* ViewController.swift */; };
 		328E93092115FBB500AA5AD4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 328E93082115FBB500AA5AD4 /* Assets.xcassets */; };
 		328E930C2115FBB500AA5AD4 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 328E930A2115FBB500AA5AD4 /* Main.storyboard */; };
+		328E93152115FC9100AA5AD4 /* MetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E93142115FC9100AA5AD4 /* MetalView.swift */; };
+		328E93172115FF9000AA5AD4 /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E93162115FF9000AA5AD4 /* Renderer.swift */; };
+		328E9319211601E800AA5AD4 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 328E9318211601E800AA5AD4 /* Shaders.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +24,9 @@
 		328E930B2115FBB500AA5AD4 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		328E930D2115FBB500AA5AD4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		328E930E2115FBB500AA5AD4 /* MetalSandbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MetalSandbox.entitlements; sourceTree = "<group>"; };
+		328E93142115FC9100AA5AD4 /* MetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
+		328E93162115FF9000AA5AD4 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
+		328E9318211601E800AA5AD4 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +65,9 @@
 				328E930A2115FBB500AA5AD4 /* Main.storyboard */,
 				328E930D2115FBB500AA5AD4 /* Info.plist */,
 				328E930E2115FBB500AA5AD4 /* MetalSandbox.entitlements */,
+				328E93142115FC9100AA5AD4 /* MetalView.swift */,
+				328E93162115FF9000AA5AD4 /* Renderer.swift */,
+				328E9318211601E800AA5AD4 /* Shaders.metal */,
 			);
 			path = MetalSandbox;
 			sourceTree = "<group>";
@@ -95,6 +104,11 @@
 				TargetAttributes = {
 					328E93002115FBB100AA5AD4 = {
 						CreatedOnToolsVersion = 9.4.1;
+						SystemCapabilities = {
+							com.apple.Sandbox = {
+								enabled = 0;
+							};
+						};
 					};
 				};
 			};
@@ -133,8 +147,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				328E93172115FF9000AA5AD4 /* Renderer.swift in Sources */,
+				328E93152115FC9100AA5AD4 /* MetalView.swift in Sources */,
 				328E93072115FBB100AA5AD4 /* ViewController.swift in Sources */,
 				328E93052115FBB100AA5AD4 /* AppDelegate.swift in Sources */,
+				328E9319211601E800AA5AD4 /* Shaders.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -269,7 +286,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = MetalSandbox/MetalSandbox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = EGVC73FZ33;
@@ -288,7 +304,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = MetalSandbox/MetalSandbox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = EGVC73FZ33;
