@@ -14,6 +14,7 @@
 		328E93152115FC9100AA5AD4 /* MetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E93142115FC9100AA5AD4 /* MetalView.swift */; };
 		328E93172115FF9000AA5AD4 /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E93162115FF9000AA5AD4 /* Renderer.swift */; };
 		328E9319211601E800AA5AD4 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 328E9318211601E800AA5AD4 /* Shaders.metal */; };
+		328E931F21176A8E00AA5AD4 /* MathUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328E931E21176A8E00AA5AD4 /* MathUtilities.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 		328E93142115FC9100AA5AD4 /* MetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
 		328E93162115FF9000AA5AD4 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
 		328E9318211601E800AA5AD4 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
+		328E931E21176A8E00AA5AD4 /* MathUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathUtilities.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +70,7 @@
 				328E93142115FC9100AA5AD4 /* MetalView.swift */,
 				328E93162115FF9000AA5AD4 /* Renderer.swift */,
 				328E9318211601E800AA5AD4 /* Shaders.metal */,
+				328E931E21176A8E00AA5AD4 /* MathUtilities.swift */,
 			);
 			path = MetalSandbox;
 			sourceTree = "<group>";
@@ -150,6 +153,7 @@
 				328E93172115FF9000AA5AD4 /* Renderer.swift in Sources */,
 				328E93152115FC9100AA5AD4 /* MetalView.swift in Sources */,
 				328E93072115FBB100AA5AD4 /* ViewController.swift in Sources */,
+				328E931F21176A8E00AA5AD4 /* MathUtilities.swift in Sources */,
 				328E93052115FBB100AA5AD4 /* AppDelegate.swift in Sources */,
 				328E9319211601E800AA5AD4 /* Shaders.metal in Sources */,
 			);
