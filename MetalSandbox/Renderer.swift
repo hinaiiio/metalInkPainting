@@ -11,7 +11,7 @@ import MetalKit
 struct Vertex {
     var position: float3
     var color: float4
-}
+} 
 
 struct VertexUniforms {
     var viewPorojectionMatrix: float4x4
@@ -48,7 +48,8 @@ class Renderer: NSObject {
     init(device: MTLDevice) {
         super.init()
         createCommandQueue(device: device)
-        createMesh(device: device)
+//        createMesh(device: device)
+        loadModel(device: device)
 //        createPipelineState(device: device)
 //        createBuffers(device: device)
         loadTexture(device: device)
@@ -102,7 +103,7 @@ class Renderer: NSObject {
         
         //create mesh
         let allocator = MTKMeshBufferAllocator(device: device)
-                let mdlMesh = MDLMesh.newBox(withDimensions: vector_float3(1),
+        let mdlMesh = MDLMesh.newBox(withDimensions: vector_float3(1),
                                              segments: vector_uint3(2),
                                              geometryType: .triangles,
                                              inwardNormals: false,
@@ -137,6 +138,65 @@ class Renderer: NSObject {
             print(error.localizedDescription)
         }
     }
+    
+    func loadModel(device: MTLDevice) {
+
+        
+        //create vertex fromat
+        let mtlVertex = MTLVertexDescriptor()
+        mtlVertex.attributes[0].format = .float3
+        mtlVertex.attributes[0].offset = 0
+        mtlVertex.attributes[0].bufferIndex = 0
+        mtlVertex.attributes[1].format = .float3
+        mtlVertex.attributes[1].offset = 12
+        mtlVertex.attributes[1].bufferIndex = 0
+        mtlVertex.attributes[2].format = .float2
+        mtlVertex.attributes[2].offset = 24
+        mtlVertex.attributes[2].bufferIndex = 0
+        mtlVertex.layouts[0].stride = 32
+        mtlVertex.layouts[0].stepRate = 1
+        
+        let modelDescriptor = MTKModelIOVertexDescriptorFromMetal(mtlVertex)
+        (modelDescriptor.attributes[0] as! MDLVertexAttribute).name = MDLVertexAttributePosition
+        (modelDescriptor.attributes[1] as! MDLVertexAttribute).name = MDLVertexAttributeNormal
+        (modelDescriptor.attributes[2] as! MDLVertexAttribute).name = MDLVertexAttributeTextureCoordinate
+        
+        //load model
+        let url = URL(string:"file:///Users/hina/Desktop/bunny.obj")
+        let allocator = MTKMeshBufferAllocator(device: device)
+        let asset = MDLAsset(url: url!, vertexDescriptor: modelDescriptor, bufferAllocator: allocator)
+        
+        mesh = try! MTKMesh.newMeshes(asset: asset, device: device).metalKitMeshes.first!
+
+        let renderDescriptor = MTLRenderPipelineDescriptor()
+        renderDescriptor.vertexDescriptor = mtlVertex
+        
+        let library = device.makeDefaultLibrary()
+        // Our vertex function name
+        let vertexFunction = library?.makeFunction(name: "lambertVertex")
+        // Our fragment function name
+        let fragmentFunction = library?.makeFunction(name: "lambertFragment")
+        // Attach the pixel format that is the same as the MetalView
+        renderDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        // Attach the shader functions
+        renderDescriptor.vertexFunction = vertexFunction
+        renderDescriptor.fragmentFunction = fragmentFunction
+        renderDescriptor.depthAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
+        renderDescriptor.stencilAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
+        //build depthstencilstate
+        let depthStencilDescriptor = MTLDepthStencilDescriptor()
+        depthStencilDescriptor.depthCompareFunction = .less
+        depthStencilDescriptor.isDepthWriteEnabled = true
+        depthStencilState = device.makeDepthStencilState(descriptor: depthStencilDescriptor)
+        
+        // Try to update the state of the renderPipeline
+        do {
+            renderMeshState = try device.makeRenderPipelineState(descriptor: renderDescriptor)
+        } catch {
+            print(error.localizedDescription)
+        }
+        
+    }
 }
 
 extension Renderer: MTKViewDelegate {
@@ -159,11 +219,18 @@ extension Renderer: MTKViewDelegate {
         commandEncoder?.setDepthStencilState(depthStencilState)
         commandEncoder?.setFragmentTexture(texture, index: 0)
         commandEncoder?.setVertexBuffer(mesh.vertexBuffers[0].buffer, offset: 0, index: 0)
+        //draw input model
         commandEncoder?.drawIndexedPrimitives(type: mesh.submeshes[0].primitiveType,
                                               indexCount: mesh.submeshes[0].indexCount,
                                               indexType: mesh.submeshes[0].indexType,
                                               indexBuffer: mesh.submeshes[0].indexBuffer.buffer,
                                               indexBufferOffset: mesh.submeshes[0].indexBuffer.offset)
+        //draw cube&sphere
+//        commandEncoder?.drawIndexedPrimitives(type: mesh.submeshes[0].primitiveType,
+//                                              indexCount: mesh.submeshes[0].indexCount,
+//                                              indexType: mesh.submeshes[0].indexType,
+//                                              indexBuffer: mesh.submeshes[0].indexBuffer.buffer,
+//                                              indexBufferOffset: mesh.submeshes[0].indexBuffer.offset)
         
         //texture render
 //        commandEncoder?.setRenderPipelineState(renderPipelineState)
@@ -183,7 +250,7 @@ extension Renderer: MTKViewDelegate {
         time += deltaTime
 //        if (time >= 1) {time = 0}
         
-        cameraWorldPosition = float3(0, 0, 5)
+        cameraWorldPosition = float3(0, 0, 0.5)
         viewMatrix = float4x4(translationBy: -cameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
         
         let aspectRadio = Float(view.drawableSize.width / view.drawableSize.height)
