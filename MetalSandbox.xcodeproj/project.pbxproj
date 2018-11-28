@@ -18,13 +18,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3278E00B21A2675E00C058BC /* MetalSandbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MetalSandbox.entitlements; sourceTree = "<group>"; };
+		3278E00D21A2782E00C058BC /* libswiftCreateML.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libswiftCreateML.dylib; path = Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/libswiftCreateML.dylib; sourceTree = DEVELOPER_DIR; };
 		328E93012115FBB100AA5AD4 /* MetalSandbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetalSandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		328E93042115FBB100AA5AD4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		328E93062115FBB100AA5AD4 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		328E93082115FBB500AA5AD4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		328E930B2115FBB500AA5AD4 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		328E930D2115FBB500AA5AD4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		328E930E2115FBB500AA5AD4 /* MetalSandbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MetalSandbox.entitlements; sourceTree = "<group>"; };
 		328E93142115FC9100AA5AD4 /* MetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
 		328E93162115FF9000AA5AD4 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
 		328E9318211601E800AA5AD4 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
@@ -42,11 +43,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3278E00C21A2782D00C058BC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3278E00D21A2782E00C058BC /* libswiftCreateML.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		328E92F82115FBB100AA5AD4 = {
 			isa = PBXGroup;
 			children = (
 				328E93032115FBB100AA5AD4 /* MetalSandbox */,
 				328E93022115FBB100AA5AD4 /* Products */,
+				3278E00C21A2782D00C058BC /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -66,7 +76,7 @@
 				328E93082115FBB500AA5AD4 /* Assets.xcassets */,
 				328E930A2115FBB500AA5AD4 /* Main.storyboard */,
 				328E930D2115FBB500AA5AD4 /* Info.plist */,
-				328E930E2115FBB500AA5AD4 /* MetalSandbox.entitlements */,
+				3278E00B21A2675E00C058BC /* MetalSandbox.entitlements */,
 				328E93142115FC9100AA5AD4 /* MetalView.swift */,
 				328E93162115FF9000AA5AD4 /* Renderer.swift */,
 				328E9318211601E800AA5AD4 /* Shaders.metal */,
@@ -289,6 +299,7 @@
 		328E93122115FBB500AA5AD4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -298,6 +309,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				PRODUCT_BUNDLE_IDENTIFIER = HINA.YUMOTO.MetalSandbox;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 4.0;
@@ -307,6 +319,7 @@
 		328E93132115FBB500AA5AD4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -316,6 +329,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				PRODUCT_BUNDLE_IDENTIFIER = HINA.YUMOTO.MetalSandbox;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 4.0;

@@ -45,6 +45,7 @@ class Renderer: NSObject {
     var gBufferNormalTexture: MTLTexture!
     var gBufferPositionTexture: MTLTexture!
     var gBufferDepthStencilTexture: MTLTexture!
+    var gBufferDepthTexture: MTLTexture!
     var gBufferDepthStencilState: MTLDepthStencilState!
     var gBufferRenderPassDescriptor: MTLRenderPassDescriptor!
     var gBufferRenderPipeline: MTLRenderPipelineState!
@@ -222,6 +223,14 @@ class Renderer: NSObject {
         gBufferPositionTextureDescriptor.usage = [.renderTarget, .shaderRead]
         gBufferPositionTexture = device.makeTexture(descriptor: gBufferPositionTextureDescriptor)
         
+        // Create GBuffer depth texture
+        let gBufferDepthDescriptor: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: drawableWidth, height: drawableHeight, mipmapped: false)
+        gBufferDepthDescriptor.sampleCount = 1
+        gBufferDepthDescriptor.storageMode = .private
+        gBufferDepthDescriptor.textureType = .type2D
+        gBufferDepthDescriptor.usage = [.renderTarget, .shaderRead]
+        gBufferDepthTexture = device.makeTexture(descriptor: gBufferDepthDescriptor)
+        
         // Create GBuffer depth stencil texture
         let gBufferDepthStencilDesc: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: MTLPixelFormat.depth32Float_stencil8, width: drawableWidth, height: drawableHeight, mipmapped: false)
         gBufferDepthStencilDesc.sampleCount = 1
@@ -258,6 +267,11 @@ class Renderer: NSObject {
         gBufferRenderPassDescriptor.colorAttachments[2].texture = gBufferPositionTexture
         gBufferRenderPassDescriptor.colorAttachments[2].loadAction = .clear
         gBufferRenderPassDescriptor.colorAttachments[2].storeAction = .store
+        // Specify the properties of the third color attachment (our position texture)
+        gBufferRenderPassDescriptor.colorAttachments[3].clearColor = MTLClearColorMake(0, 0, 0, 1)
+        gBufferRenderPassDescriptor.colorAttachments[3].texture = gBufferDepthTexture
+        gBufferRenderPassDescriptor.colorAttachments[3].loadAction = .clear
+        gBufferRenderPassDescriptor.colorAttachments[3].storeAction = .store
         // Specify the properties of the depth attachment
         gBufferRenderPassDescriptor.depthAttachment.loadAction = .clear
         gBufferRenderPassDescriptor.depthAttachment.storeAction = .store
@@ -296,6 +310,7 @@ class Renderer: NSObject {
         
         gBufferRenderPipelineDesc.colorAttachments[1].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[2].pixelFormat = .rgba16Float
+        gBufferRenderPipelineDesc.colorAttachments[3].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.stencilAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.sampleCount = 1
@@ -352,7 +367,7 @@ extension Renderer: MTKViewDelegate {
         commandEncoder?.setVertexBytes(&vertexUnifroms, length: MemoryLayout<VertexUniforms>.size, index: 1)
         commandEncoder?.setCullMode(.front)
         commandEncoder?.setDepthStencilState(depthStencilState)
-        commandEncoder?.setFragmentTexture(gBufferNormalTexture, index: 0)
+        commandEncoder?.setFragmentTexture(gBufferDepthStencilTexture, index: 0)
         commandEncoder?.setVertexBuffer(mesh.vertexBuffers[0].buffer, offset: 0, index: 0)
         //draw input model | draw cube&sphere
         commandEncoder?.drawIndexedPrimitives(type: mesh.submeshes[0].primitiveType,
@@ -379,19 +394,20 @@ extension Renderer: MTKViewDelegate {
         time += deltaTime
 //        if (time >= 1) {time = 0}
          let aspectRadio = Float(view.drawableSize.width / view.drawableSize.height)
-        let angle = -time
+//        let angle = -time
+        let angle = 0
         
         //gbuffer pass
-        gBufferCameraWorldPosition = float3(0, 0, 0.5)
+        gBufferCameraWorldPosition = float3(0, 0.1, 0.5)
         gBufferViewMatrix = float4x4(translationBy: -gBufferCameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
         gBufferProjectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 6, aspectRatio: aspectRadio, nearZ: 0.001, farZ: 100)
-        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: 0.0) * float4x4(scaleBy: 2.0)
+        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: 0.0) * float4x4(scaleBy: 2.2)
         
         //second pass
         cameraWorldPosition = float3(0, 0, 5)
         viewMatrix = float4x4(translationBy: -cameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
         projectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 6, aspectRatio: aspectRadio, nearZ: 0.001, farZ: 100)
-        modelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: angle)
+        modelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: Float(angle)) * float4x4(scaleBy: 1.8)
     }
     
 }
