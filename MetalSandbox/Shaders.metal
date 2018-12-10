@@ -55,7 +55,6 @@ struct PanelVertexIn {
     float2      texcoord       [[ attribute(2) ]];
 };
 
-
 vertex VertexOut gBufferVert //(const device VertexIn *vertices[[buffer(0)]],
 //                             const device VertexUniforms &uniforms [[buffer(1)]],
 //                             unsigned int vid [[vertex_id]]) {
@@ -126,28 +125,6 @@ fragment float4 lambertFragment(VertexOut vIn [[ stage_in ]], texture2d<float> t
 //    float gray = color.x * 0.29 + color.y * 0.58 + color.z * 0.11;
 //    color = float4(gray, gray, gray, 1.0);
     
-    const int filtersize = 3;
-    int margin = (filtersize - 1) / 2;
-    int karnel[filtersize*filtersize] = { 1, 1, 1, 1, -8, 1, 1, 1, 1};
-//    for(int h = margin; h < originalImg.height() -margin; h++ ) {
-//        for(int w = margin; w < originalImg.width() -margin; w++ ) {
-//            int i = 0;
-//            int sum = 0;
-//            for(int p = -margin; p <= margin; p++){
-//                for(int q = -margin; q <= margin; q++){
-//                    QColor originalcolor(originalImg.pixel(w+p, h+q));
-//
-//                    sum+= originalcolor.red()*kernel[i];
-//                    i++;
-//                }
-//            }
-//            sum = abs(sum);
-//            if(sum > 255) sum = 255;
-//            QColor color = QColor(sum, sum, sum);
-//            filteredImg.setPixelColor(w,h,color);
-//        }
-//    }
-    
     return color;
 }
 
@@ -165,12 +142,76 @@ fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]], /*constant
 //    float4 color = texture.sample(linear_sampler, vIn.texcoord);
     constexpr sampler linear_sampler(min_filter::linear, mag_filter::linear);
     float4 color = texture.sample(linear_sampler, vIn.texcoord);
-//    float4 color = texture.sample(colorSampler, vIn.color.xy+time.time);
-//    vIn.color = float4(time, time, time, 1);
-//    return float4(color.xy, time.time2, 1);
-//    return vIn.color;
     return color;
 //    return float4(0, 0, 0, 1);
+}
+
+kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [[ texture(0) ]],
+                                  texture2d<half, access::read> inNormalTexture [[ texture(1) ]],
+                                  texture2d<half, access::read> inIdTexture [[ texture(2) ]],
+                                  texture2d<half, access::write> outTexture [[ texture(3) ]],
+                                  uint2 gid [[thread_position_in_grid]]) {
+    
+    matrix<half, 3, 3> weights;
+    constexpr int size = 3;
+    constexpr int radius = size / 2;
+    weights[0][0] = 1;
+    weights[0][1] = 1;
+    weights[0][2] = 1;
+    weights[1][0] = 1;
+    weights[1][1] = -8;
+    weights[1][2] = 1;
+    weights[2][0] = 1;
+    weights[2][1] = 1;
+    weights[2][2] = 1;
+
+    half4 accumDepthColor(0, 0, 0, 0);
+    half4 accumNormalColor(0, 0, 0, 0);
+    half4 accumIdColor(0, 0, 0, 0);
+    for (int j = 0; j < size; ++j)
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            uint2 textureIndex(gid.x + (i - radius), gid.y + (j - radius));
+            half4 depth = inDepthTexture.read(textureIndex).rgba;
+            half4 normal = inNormalTexture.read(textureIndex).rgba;
+            half4 id = inIdTexture.read(textureIndex).rgba;
+            half weight = weights[i][j];
+            accumDepthColor += weight * depth;
+            accumNormalColor += weight * normal;
+            accumIdColor += weight * id;
+//            accumSilCreColor += (weight * depth - weight * normal)/2;
+//            accumCreColor += (weight * depth - weight * normal + weight * id);
+        }
+    }
+//
+//    half4 accumSilCreColor = half4(accumDepthColor.rgb/2 - accumNormalColor.rgb/2, 1.0);
+//    if (accumSilCreColor.r < 0.0) accumSilCreColor = half4(0.0, 0.0, 0.0, 1.0);
+//    if (accumSilCreColor.r > 1.0) accumSilCreColor = half4(1.0, 1.0, 1.0, 1.0);
+//    half4 accumCreColor = half4(accumSilCreColor.rgb + accumIdColor.rgb, 1.0);
+//    if (accumCreColor.r < 0.0) accumCreColor = half4(0.0, 0.0, 0.0, 1.0);
+//    if (accumCreColor.r > 1.0) accumCreColor = half4(1.0, 1.0, 1.0, 1.0);
+
+    half depthValue = dot(accumDepthColor.rgb, half3(0.299, 0.587, 0.114));
+    half normalValue = dot(accumNormalColor.rgb, half3(0.299, 0.587, 0.114));
+    half idValue = dot(accumIdColor.rgb, half3(0.299, 0.587, 0.114));
+    half silCreValue = depthValue/2 + normalValue/2;
+    if (silCreValue < 0.0) silCreValue = 0.0;
+    if (silCreValue > 1.0) silCreValue = 1.0;
+    half creValue = silCreValue*2 - idValue*2;
+    if (creValue < 0.0) creValue = 0.0;
+    if (creValue > 1.0) creValue = 0.0;
+    
+    half4 depthColor(depthValue, depthValue, depthValue, 1.0);
+    half4 normalColor(normalValue, normalValue, normalValue, 1.0);
+    half4 idColor(idValue, idValue, idValue, 1.0);
+    half4 silCreColor(silCreValue, silCreValue, silCreValue, 1.0);
+    half4 creColor(creValue, creValue, creValue, 1.0);
+
+    outTexture.write(creColor, gid);
+
+//    half4 inColor = inTexture.read(gid);
+//    outTexture.write(inColor, gid);
 }
 
 

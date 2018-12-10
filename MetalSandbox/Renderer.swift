@@ -42,6 +42,15 @@ class Renderer: NSObject {
     var vertexBuffer: MTLBuffer!
     var texture: MTLTexture!
     
+    var mesh: MTKMesh!
+    var sphereMesh: MTKMesh!
+    var bunnyMesh: MTKMesh!
+    var time: Float = 0
+    var cameraWorldPosition = float3(0, 0, 5)
+    var modelMatrix = matrix_identity_float4x4
+    var viewMatrix = matrix_identity_float4x4
+    var projectionMatrix = matrix_identity_float4x4
+    
     var gBufferAlbedoTexture: MTLTexture!
     var gBufferNormalTexture: MTLTexture!
     var gBufferPositionTexture: MTLTexture!
@@ -53,19 +62,13 @@ class Renderer: NSObject {
     var gBufferRenderPassDescriptor: MTLRenderPassDescriptor!
     var gBufferRenderPipeline: MTLRenderPipelineState!
     
-    var mesh: MTKMesh!
-    var sphereMesh: MTKMesh!
-    var bunnyMesh: MTKMesh!
-    var time: Float = 0
-    var cameraWorldPosition = float3(0, 0, 5)
-    var modelMatrix = matrix_identity_float4x4
-    var viewMatrix = matrix_identity_float4x4
-    var projectionMatrix = matrix_identity_float4x4
-    
     var gBufferCameraWorldPosition = float3(0, 0, 0.5)
     var gBufferModelMatrix = matrix_identity_float4x4
     var gBufferViewMatrix = matrix_identity_float4x4
     var gBufferProjectionMatrix = matrix_identity_float4x4
+    
+    var filterPipeline:  MTLComputePipelineState!
+    var outTexture: MTLTexture!
     
     var vertices: [Vertex] = [
         Vertex(position: float3(1,-1,0),  color: float4(1,1,1,1), texcood: float2(0, 1)),
@@ -83,9 +86,10 @@ class Renderer: NSObject {
         createPipelineState(device: device)
         createBuffers(device: device)
         loadModel(device: device)
-//        loadTexture(device: device)
+        loadTexture(device: device)
         createGBuffers(device: device)
 //        createMesh(device: device)
+        laplacianFilter(device: device)
     }
     
     func createCommandQueue(device: MTLDevice) {
@@ -300,11 +304,11 @@ class Renderer: NSObject {
         gBufferRenderPassDescriptor.colorAttachments[4].texture = gBufferidTexture
         gBufferRenderPassDescriptor.colorAttachments[4].loadAction = .clear
         gBufferRenderPassDescriptor.colorAttachments[4].storeAction = .store
-        // Specify the properties of the third color attachment (our filtered texture)
-        gBufferRenderPassDescriptor.colorAttachments[5].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        gBufferRenderPassDescriptor.colorAttachments[5].texture = gBufferDepthTexture
-        gBufferRenderPassDescriptor.colorAttachments[5].loadAction = .clear
-        gBufferRenderPassDescriptor.colorAttachments[5].storeAction = .store
+//        // Specify the properties of the third color attachment (our filtered texture)
+//        gBufferRenderPassDescriptor.colorAttachments[5].clearColor = MTLClearColorMake(0, 0, 0, 1)
+//        gBufferRenderPassDescriptor.colorAttachments[5].texture = gBufferDepthTexture
+//        gBufferRenderPassDescriptor.colorAttachments[5].loadAction = .clear
+//        gBufferRenderPassDescriptor.colorAttachments[5].storeAction = .store
         // Specify the properties of the depth attachment
         gBufferRenderPassDescriptor.depthAttachment.loadAction = .clear
         gBufferRenderPassDescriptor.depthAttachment.storeAction = .store
@@ -345,7 +349,7 @@ class Renderer: NSObject {
         gBufferRenderPipelineDesc.colorAttachments[2].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[3].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[4].pixelFormat = .rgba16Float
-        gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
+//        gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.stencilAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.sampleCount = 1
@@ -357,6 +361,20 @@ class Renderer: NSObject {
             gBufferRenderPipeline = try device.makeRenderPipelineState(descriptor: gBufferRenderPipelineDesc)
         } catch let error {
             fatalError("Failed to create GBuffer pipeline state, error \(error)")
+        }
+    }
+    
+    func laplacianFilter(device: MTLDevice) {
+        let library = device.makeDefaultLibrary()
+        let function = library?.makeFunction(name: "kernel_laplacian_func")
+        let outTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int(gBufferidTexture.width), height: Int(gBufferidTexture.height), mipmapped: false)
+        outTextureDescriptor.usage = [.shaderRead, .shaderWrite]
+        outTexture = device.makeTexture(descriptor: outTextureDescriptor)
+        
+        do {
+            filterPipeline = try device.makeComputePipelineState(function: function!)
+        } catch let error {
+            fatalError("Failed to filter pipeline state, error \(error)")
         }
     }
 }
@@ -392,8 +410,28 @@ extension Renderer: MTKViewDelegate {
                                        indexBuffer: bunnyMesh.submeshes[0].indexBuffer.buffer,
                                        indexBufferOffset: bunnyMesh.submeshes[0].indexBuffer.offset)
         gBufferEncoder?.endEncoding()
-//        commandBuffer?.present(drawable)￥
+//        commandBuffer?.present(drawable)
         gBufferCommandBuffer?.commit()
+        
+        let filterCommandBuffer = commandQueue.makeCommandBuffer()!
+        let filterEncoder = filterCommandBuffer.makeComputeCommandEncoder()!
+        filterEncoder.setComputePipelineState(filterPipeline)
+        filterEncoder.setTexture(gBufferDepthTexture, index: 0)
+        filterEncoder.setTexture(gBufferNormalTexture, index: 1)
+        filterEncoder.setTexture(gBufferidTexture, index: 2)
+        filterEncoder.setTexture(outTexture, index: 3)
+        let w = filterPipeline.threadExecutionWidth
+        let h = filterPipeline.maxTotalThreadsPerThreadgroup / w
+        let threadsPerThreadgroup = MTLSizeMake(w, h, 1)
+        let threadsPerGrid = MTLSize(width: gBufferidTexture.width,
+                                     height: gBufferidTexture.height,
+                                     depth: 1)
+//        let threadgroupsPerGrid = MTLSize(width: (texture.width + w - 1) / w,
+//                                          height: (texture.height + h - 1) / h,
+//                                          depth: 1)
+        filterEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+        filterEncoder.endEncoding()
+        filterCommandBuffer.commit()
         
         let commandBuffer = commandQueue.makeCommandBuffer()
         let commandEncoder = commandBuffer?.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
@@ -410,12 +448,13 @@ extension Renderer: MTKViewDelegate {
 //                                              indexType: mesh.submeshes[0].indexType,
 //                                              indexBuffer: mesh.submeshes[0].indexBuffer.buffer,
 //                                              indexBufferOffset: mesh.submeshes[0].indexBuffer.offset)
+
         //texture render
         commandEncoder?.setRenderPipelineState(renderPipelineState)
         // Pass in the vertexBuffer into index 0
         commandEncoder?.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
         // commandEncoder?.setFragmentBytes(&time, length: MemoryLayout<TimeUniform>.size, index: 0)
-        commandEncoder?.setFragmentTexture(gBufferidTexture, index: 0)
+        commandEncoder?.setFragmentTexture(outTexture, index: 0)
         // Draw primitive at vertexStart 0
         commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: vertices.count)
 //        commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 1, vertexCount: 3)
