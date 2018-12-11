@@ -57,7 +57,7 @@ class Renderer: NSObject {
     var gBufferDepthStencilTexture: MTLTexture!
     var gBufferDepthTexture: MTLTexture!
     var gBufferidTexture: MTLTexture!
-    var gBufferEdgeTexture: MTLTexture!
+    var gBufferbwTexture: MTLTexture!
     var gBufferDepthStencilState: MTLDepthStencilState!
     var gBufferRenderPassDescriptor: MTLRenderPassDescriptor!
     var gBufferRenderPipeline: MTLRenderPipelineState!
@@ -106,7 +106,14 @@ class Renderer: NSObject {
         // Create basic descriptor
         let renderPipelineDescriptor = MTLRenderPipelineDescriptor()
         // Attach the pixel format that is the same as the MetalView
-        renderPipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        renderPipelineDescriptor.colorAttachments[0].pixelFormat                 = .bgra8Unorm
+        renderPipelineDescriptor.colorAttachments[0].isBlendingEnabled           = true
+        renderPipelineDescriptor.colorAttachments[0].rgbBlendOperation           = .add
+        renderPipelineDescriptor.colorAttachments[0].alphaBlendOperation         = .add
+        renderPipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor        = .one
+        renderPipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor      = .sourceAlpha
+        renderPipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor   = .oneMinusSourceAlpha
+        renderPipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         // Attach the shader functions
         renderPipelineDescriptor.vertexFunction = vertexFunction
         renderPipelineDescriptor.fragmentFunction = fragmentFunction
@@ -126,7 +133,7 @@ class Renderer: NSObject {
     
     func loadTexture(device: MTLDevice) {
         let textureLoader = MTKTextureLoader(device: device)
-        let url = URL(string:"file:///Users/hina/Desktop/IMG_9264.JPG")
+        let url = URL(string:"file:///Users/hina/Desktop/nijimi2.png")
         texture = try! textureLoader.newTexture(URL: url!, options: [:])
 //        print(texture.pixelFormat.rawValue)
     }
@@ -251,12 +258,12 @@ class Renderer: NSObject {
         gBufferidTexture = device.makeTexture(descriptor: gBufferidDescriptor)
         
         // Create filtered texture
-        let gBufferEdgeDescriptor: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: drawableWidth, height: drawableHeight, mipmapped: false)
-        gBufferEdgeDescriptor.sampleCount = 1
-        gBufferEdgeDescriptor.storageMode = .private
-        gBufferEdgeDescriptor.textureType = .type2D
-        gBufferEdgeDescriptor.usage = [.renderTarget, .shaderRead]
-        gBufferEdgeTexture = device.makeTexture(descriptor: gBufferEdgeDescriptor)
+        let gBufferbwDescriptor: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: drawableWidth, height: drawableHeight, mipmapped: false)
+        gBufferbwDescriptor.sampleCount = 1
+        gBufferbwDescriptor.storageMode = .private
+        gBufferbwDescriptor.textureType = .type2D
+        gBufferbwDescriptor.usage = [.renderTarget, .shaderRead]
+        gBufferbwTexture = device.makeTexture(descriptor: gBufferbwDescriptor)
         
         // Create GBuffer depth stencil texture
         let gBufferDepthStencilDesc: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: MTLPixelFormat.depth32Float_stencil8, width: drawableWidth, height: drawableHeight, mipmapped: false)
@@ -304,11 +311,11 @@ class Renderer: NSObject {
         gBufferRenderPassDescriptor.colorAttachments[4].texture = gBufferidTexture
         gBufferRenderPassDescriptor.colorAttachments[4].loadAction = .clear
         gBufferRenderPassDescriptor.colorAttachments[4].storeAction = .store
-//        // Specify the properties of the third color attachment (our filtered texture)
-//        gBufferRenderPassDescriptor.colorAttachments[5].clearColor = MTLClearColorMake(0, 0, 0, 1)
-//        gBufferRenderPassDescriptor.colorAttachments[5].texture = gBufferDepthTexture
-//        gBufferRenderPassDescriptor.colorAttachments[5].loadAction = .clear
-//        gBufferRenderPassDescriptor.colorAttachments[5].storeAction = .store
+        // Specify the properties of the third color attachment (our b/w id texture)
+        gBufferRenderPassDescriptor.colorAttachments[5].clearColor = MTLClearColorMake(0, 0, 0, 1)
+        gBufferRenderPassDescriptor.colorAttachments[5].texture = gBufferbwTexture
+        gBufferRenderPassDescriptor.colorAttachments[5].loadAction = .clear
+        gBufferRenderPassDescriptor.colorAttachments[5].storeAction = .store
         // Specify the properties of the depth attachment
         gBufferRenderPassDescriptor.depthAttachment.loadAction = .clear
         gBufferRenderPassDescriptor.depthAttachment.storeAction = .store
@@ -349,6 +356,7 @@ class Renderer: NSObject {
         gBufferRenderPipelineDesc.colorAttachments[2].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[3].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[4].pixelFormat = .rgba16Float
+        gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
 //        gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.stencilAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
@@ -387,10 +395,10 @@ extension Renderer: MTKViewDelegate {
 
         // Get the current drawable and descriptor
         guard let drawable = view.currentDrawable,
-            let renderPassDescriptor = view.currentRenderPassDescriptor else {return}
-        let viewProjectionMatrix = projectionMatrix * viewMatrix
+        let renderPassDescriptor = view.currentRenderPassDescriptor else {return}
         let gBufferviewProjectionMatrix = gBufferProjectionMatrix * gBufferViewMatrix
-        var vertexUnifroms = VertexUniforms(viewPorojectionMatrix: viewProjectionMatrix, modelMatrix: modelMatrix, normalMatrix: modelMatrix.normalMatrix)
+//        let viewProjectionMatrix = projectionMatrix * viewMatrix
+//        var vertexUnifroms = VertexUniforms(viewPorojectionMatrix: viewProjectionMatrix, modelMatrix: modelMatrix, normalMatrix: modelMatrix.normalMatrix)
         var gBufferVertexUnifroms = GBunfferVertexUniforms(gBufferViewPorojectionMatrix: gBufferviewProjectionMatrix, gBufferModelMatrix: gBufferModelMatrix, gBufferNormalMatrix: gBufferModelMatrix.normalMatrix)
          // ---- GBUFFER ---- //
         // Create a buffer from the commandQueue
@@ -455,6 +463,8 @@ extension Renderer: MTKViewDelegate {
         commandEncoder?.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
         // commandEncoder?.setFragmentBytes(&time, length: MemoryLayout<TimeUniform>.size, index: 0)
         commandEncoder?.setFragmentTexture(outTexture, index: 0)
+        commandEncoder?.setFragmentTexture(texture, index: 1)
+        commandEncoder?.setFragmentTexture(gBufferbwTexture, index: 2)
         // Draw primitive at vertexStart 0
         commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: vertices.count)
 //        commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 1, vertexCount: 3)

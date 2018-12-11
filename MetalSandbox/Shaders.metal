@@ -40,7 +40,7 @@ struct GBufferOut {
     float4 position  [[color(2)]];
     float4 depth [[color(3)]];
     float4 id [[color(4)]];
-    float4 edge [[color(5)]];
+    float4 bw [[color(5)]];
 };
 
 struct VertexUniforms {
@@ -101,6 +101,7 @@ fragment GBufferOut gBufferFrag(VertexOut in[[stage_in]], texture2d<float> albed
     depth = (depth-dmin)/(dmax-dmin);
     output.depth = float4(float3(depth), 1.0);
     output.id = float4(0.64, 0.64, 0.63, 1.0);
+    output.bw = float4(1.0, 1.0, 1.0, 1.0);
     
     return output;
 }
@@ -137,12 +138,23 @@ vertex VertexOut basic_vertex_function(const device PanelVertexIn *vertices [[ b
     return vOut;
 }
 
-fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]], /*constant TimeUnifrom &time [[buffer(0)]],*/ texture2d<float> texture [[ texture(0) ]]) {
+fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]],
+                                        texture2d<float> inTexture [[ texture(0) ]],
+                                        texture2d<float> nijimiTexture [[ texture(1) ]],
+                                        texture2d<float> bwTexture [[ texture(2) ]]
+                                        /*, constant TimeUnifrom &time [[buffer(0)]]*/) {
 //    constexpr sampler colorSampler(address::repeat);
 //    float4 color = texture.sample(linear_sampler, vIn.texcoord);
+    float intensity = 0.4;
     constexpr sampler linear_sampler(min_filter::linear, mag_filter::linear);
-    float4 color = texture.sample(linear_sampler, vIn.texcoord);
-    return color;
+    float4 incolor = inTexture.sample(linear_sampler, vIn.texcoord);
+    float4 nijimicolor = nijimiTexture.sample(linear_sampler, vIn.texcoord);
+    float4 bwcolor = bwTexture.sample(linear_sampler, vIn.texcoord);
+    float4 resultcolor = incolor;
+    if (bwcolor.r == 1.0) {
+        resultcolor = intensity * nijimicolor + (1.0 - intensity) * incolor;
+    }
+    return float4(resultcolor.r, resultcolor.g, resultcolor.b, incolor.a);
 //    return float4(0, 0, 0, 1);
 }
 
@@ -180,17 +192,8 @@ kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [
             accumDepthColor += weight * depth;
             accumNormalColor += weight * normal;
             accumIdColor += weight * id;
-//            accumSilCreColor += (weight * depth - weight * normal)/2;
-//            accumCreColor += (weight * depth - weight * normal + weight * id);
         }
     }
-//
-//    half4 accumSilCreColor = half4(accumDepthColor.rgb/2 - accumNormalColor.rgb/2, 1.0);
-//    if (accumSilCreColor.r < 0.0) accumSilCreColor = half4(0.0, 0.0, 0.0, 1.0);
-//    if (accumSilCreColor.r > 1.0) accumSilCreColor = half4(1.0, 1.0, 1.0, 1.0);
-//    half4 accumCreColor = half4(accumSilCreColor.rgb + accumIdColor.rgb, 1.0);
-//    if (accumCreColor.r < 0.0) accumCreColor = half4(0.0, 0.0, 0.0, 1.0);
-//    if (accumCreColor.r > 1.0) accumCreColor = half4(1.0, 1.0, 1.0, 1.0);
 
     half depthValue = dot(accumDepthColor.rgb, half3(0.299, 0.587, 0.114));
     half normalValue = dot(accumNormalColor.rgb, half3(0.299, 0.587, 0.114));
@@ -202,16 +205,21 @@ kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [
     if (creValue < 0.0) creValue = 0.0;
     if (creValue > 1.0) creValue = 0.0;
     
-    half4 depthColor(depthValue, depthValue, depthValue, 1.0);
-    half4 normalColor(normalValue, normalValue, normalValue, 1.0);
-    half4 idColor(idValue, idValue, idValue, 1.0);
-    half4 silCreColor(silCreValue, silCreValue, silCreValue, 1.0);
-    half4 creColor(creValue, creValue, creValue, 1.0);
-
-    outTexture.write(creColor, gid);
+//    half4 depthColor(depthValue, depthValue, depthValue, 1.0);
+//    half4 normalColor(normalValue, normalValue, normalValue, 1.0);
+//    half4 idColor(idValue, idValue, idValue, 1.0);
+//    half4 silCreColor(silCreValue, silCreValue, silCreValue, 1.0);
+//    half4 creColor(creValue, creValue, creValue, 1.0);
+    
+    half4 resultColor(0.0, 0.0, 0.0, 1.0);
+    if (creValue > 0.6) {
+        resultColor = half4(creValue, creValue, creValue, creValue);
+    } else {
+        resultColor = inIdTexture.read(gid);
+    }
+    
+    outTexture.write(resultColor, gid);
 
 //    half4 inColor = inTexture.read(gid);
 //    outTexture.write(inColor, gid);
 }
-
-
