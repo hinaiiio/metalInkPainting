@@ -68,7 +68,11 @@ class Renderer: NSObject {
     var gBufferProjectionMatrix = matrix_identity_float4x4
     
     var filterPipeline:  MTLComputePipelineState!
+    var dilationPipeline:  MTLComputePipelineState!
+    var erosionPipeline:  MTLComputePipelineState!
     var outTexture: MTLTexture!
+    var edgeOutTexture: MTLTexture!
+    var edgeOutTexture2: MTLTexture!
     
     var vertices: [Vertex] = [
         Vertex(position: float3(1,-1,0),  color: float4(1,1,1,1), texcood: float2(0, 1)),
@@ -82,14 +86,16 @@ class Renderer: NSObject {
     
     init(device: MTLDevice) {
         super.init()
+        loadModel(device: device)
+        createGBuffers(device: device)
         createCommandQueue(device: device)
         createPipelineState(device: device)
         createBuffers(device: device)
-        loadModel(device: device)
-        loadTexture(device: device)
-        createGBuffers(device: device)
-//        createMesh(device: device)
         laplacianFilter(device: device)
+        dilation(device: device)
+        erosion(device: device)
+        loadTexture(device: device)
+        //        createMesh(device: device)
     }
     
     func createCommandQueue(device: MTLDevice) {
@@ -378,9 +384,34 @@ class Renderer: NSObject {
         let outTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int(gBufferidTexture.width), height: Int(gBufferidTexture.height), mipmapped: false)
         outTextureDescriptor.usage = [.shaderRead, .shaderWrite]
         outTexture = device.makeTexture(descriptor: outTextureDescriptor)
-        
         do {
             filterPipeline = try device.makeComputePipelineState(function: function!)
+        } catch let error {
+            fatalError("Failed to filter pipeline state, error \(error)")
+        }
+    }
+    
+    func dilation(device: MTLDevice) {
+        let library = device.makeDefaultLibrary()
+        let function = library?.makeFunction(name: "kernel_dilation_func")
+        let outTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int(gBufferidTexture.width), height: Int(gBufferidTexture.height), mipmapped: false)
+        outTextureDescriptor.usage = [.shaderRead, .shaderWrite]
+        edgeOutTexture = device.makeTexture(descriptor: outTextureDescriptor)
+        do {
+            dilationPipeline = try device.makeComputePipelineState(function: function!)
+        } catch let error {
+            fatalError("Failed to filter pipeline state, error \(error)")
+        }
+    }
+    
+    func erosion(device: MTLDevice) {
+        let library = device.makeDefaultLibrary()
+        let function = library?.makeFunction(name: "kernel_erosion_func")
+        let outTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: Int(gBufferidTexture.width), height: Int(gBufferidTexture.height), mipmapped: false)
+        outTextureDescriptor.usage = [.shaderRead, .shaderWrite]
+        edgeOutTexture2 = device.makeTexture(descriptor: outTextureDescriptor)
+        do {
+            erosionPipeline = try device.makeComputePipelineState(function: function!)
         } catch let error {
             fatalError("Failed to filter pipeline state, error \(error)")
         }
@@ -421,6 +452,7 @@ extension Renderer: MTKViewDelegate {
 //        commandBuffer?.present(drawable)
         gBufferCommandBuffer?.commit()
         
+         // ---- LAPLACIAN FILTER ---- //
         let filterCommandBuffer = commandQueue.makeCommandBuffer()!
         let filterEncoder = filterCommandBuffer.makeComputeCommandEncoder()!
         filterEncoder.setComputePipelineState(filterPipeline)
@@ -441,6 +473,39 @@ extension Renderer: MTKViewDelegate {
         filterEncoder.endEncoding()
         filterCommandBuffer.commit()
         
+         // ---- EDGE FILTER ---- //
+
+//        let edgeFilterCommandBuffer = commandQueue.makeCommandBuffer()!
+//        let edgeFilterEncoder = edgeFilterCommandBuffer.makeComputeCommandEncoder()!
+//        edgeFilterEncoder.setComputePipelineState(dilationPipeline)
+//        edgeFilterEncoder.setTexture(outTexture, index: 0)
+//        edgeFilterEncoder.setTexture(edgeOutTexture, index: 1)
+//        edgeFilterEncoder.setTexture(gBufferidTexture, index: 2)
+//        edgeFilterEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+//        edgeFilterEncoder.endEncoding()
+//        edgeFilterCommandBuffer.commit()
+//
+//        let edgeFilterCommandBuffer2 = commandQueue.makeCommandBuffer()!
+//        let edgeFilterEncoder2 = edgeFilterCommandBuffer2.makeComputeCommandEncoder()!
+//        edgeFilterEncoder2.setComputePipelineState(dilationPipeline)
+//        edgeFilterEncoder2.setTexture(edgeOutTexture, index: 0)
+//        edgeFilterEncoder2.setTexture(outTexture, index: 1)
+//        edgeFilterEncoder2.setTexture(gBufferidTexture, index: 2)
+//        edgeFilterEncoder2.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+//        edgeFilterEncoder2.endEncoding()
+//        edgeFilterCommandBuffer2.commit()
+//
+//        let edgeFilterCommandBuffer4 = commandQueue.makeCommandBuffer()!
+//        let edgeFilterEncoder4 = edgeFilterCommandBuffer4.makeComputeCommandEncoder()!
+//        edgeFilterEncoder4.setComputePipelineState(erosionPipeline)
+//        edgeFilterEncoder4.setTexture(edgeOutTexture, index: 0)
+//        edgeFilterEncoder4.setTexture(edgeOutTexture2, index: 1)
+//        edgeFilterEncoder4.setTexture(gBufferidTexture, index: 2)
+//        edgeFilterEncoder4.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+//        edgeFilterEncoder4.endEncoding()
+//        edgeFilterCommandBuffer4.commit()
+
+        // ---- PLANE BUFFER ---- //
         let commandBuffer = commandQueue.makeCommandBuffer()
         let commandEncoder = commandBuffer?.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
 //        commandEncoder?.setRenderPipelineState(renderPipelineState)
@@ -463,8 +528,9 @@ extension Renderer: MTKViewDelegate {
         commandEncoder?.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
         // commandEncoder?.setFragmentBytes(&time, length: MemoryLayout<TimeUniform>.size, index: 0)
         commandEncoder?.setFragmentTexture(outTexture, index: 0)
-        commandEncoder?.setFragmentTexture(texture, index: 1)
-        commandEncoder?.setFragmentTexture(gBufferbwTexture, index: 2)
+        commandEncoder?.setFragmentTexture(gBufferidTexture, index: 1)
+        commandEncoder?.setFragmentTexture(texture, index: 2)
+        commandEncoder?.setFragmentTexture(gBufferbwTexture, index: 3)
         // Draw primitive at vertexStart 0
         commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: vertices.count)
 //        commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 1, vertexCount: 3)
@@ -483,10 +549,10 @@ extension Renderer: MTKViewDelegate {
 //        let angle = 0
         
         //gbuffer pass
-        gBufferCameraWorldPosition = float3(0, 0.1, 0.5)
+        gBufferCameraWorldPosition = float3(0, 0.2, 0.5)
         gBufferViewMatrix = float4x4(translationBy: -gBufferCameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
         gBufferProjectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 6, aspectRatio: aspectRadio, nearZ: 0.001, farZ: 100)
-        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: Float(angle)) * float4x4(scaleBy: 2.2)
+        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: Float(angle)) * float4x4(scaleBy: 2.4)
         
         //second pass
         cameraWorldPosition = float3(0, 0, 5)
@@ -494,5 +560,5 @@ extension Renderer: MTKViewDelegate {
         projectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 6, aspectRatio: aspectRadio, nearZ: 0.001, farZ: 100)
         modelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: 0.0) * float4x4(scaleBy: 1.8)
     }
-    
 }
+

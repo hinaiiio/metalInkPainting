@@ -140,22 +140,32 @@ vertex VertexOut basic_vertex_function(const device PanelVertexIn *vertices [[ b
 
 fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]],
                                         texture2d<float> inTexture [[ texture(0) ]],
-                                        texture2d<float> nijimiTexture [[ texture(1) ]],
-                                        texture2d<float> bwTexture [[ texture(2) ]]
+                                        texture2d<float> idTexture [[ texture(1) ]],
+                                        texture2d<float> nijimiTexture [[ texture(2) ]],
+                                        texture2d<float> bwTexture [[ texture(3) ]]
                                         /*, constant TimeUnifrom &time [[buffer(0)]]*/) {
 //    constexpr sampler colorSampler(address::repeat);
 //    float4 color = texture.sample(linear_sampler, vIn.texcoord);
     float intensity = 0.4;
     constexpr sampler linear_sampler(min_filter::linear, mag_filter::linear);
     float4 incolor = inTexture.sample(linear_sampler, vIn.texcoord);
+    float4 idcolor = idTexture.sample(linear_sampler, vIn.texcoord);
     float4 nijimicolor = nijimiTexture.sample(linear_sampler, vIn.texcoord);
     float4 bwcolor = bwTexture.sample(linear_sampler, vIn.texcoord);
-    float4 resultcolor = incolor;
+    float4 resultColor = incolor;
+    
+//    if (bwcolor.r == 1.0 && incolor.r == 1.0) {
+//        resultColor = float4(incolor.rgb, 1.0);
+//    } else {
+//        resultColor = float4(idcolor.rgb, 1.0);
+//    }
+    
     if (bwcolor.r == 1.0) {
-        resultcolor = intensity * nijimicolor + (1.0 - intensity) * incolor;
+        resultColor = intensity * nijimicolor + (1.0 - intensity) * resultColor;
     }
-    return float4(resultcolor.r, resultcolor.g, resultcolor.b, incolor.a);
-//    return float4(0, 0, 0, 1);
+
+    return float4(resultColor.rgb, incolor.a);
+//    return incolor;
 }
 
 kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [[ texture(0) ]],
@@ -209,17 +219,82 @@ kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [
 //    half4 normalColor(normalValue, normalValue, normalValue, 1.0);
 //    half4 idColor(idValue, idValue, idValue, 1.0);
 //    half4 silCreColor(silCreValue, silCreValue, silCreValue, 1.0);
-//    half4 creColor(creValue, creValue, creValue, 1.0);
+    half4 creColor(creValue, creValue, creValue, 1.0);
     
-    half4 resultColor(0.0, 0.0, 0.0, 1.0);
-    if (creValue > 0.6) {
-        resultColor = half4(creValue, creValue, creValue, creValue);
+    half ave = (creColor.r + creColor.g + creColor.b)/3;
+    if (ave > 0.5) {
+        creColor = half4(1.0, 1.0, 1.0, 1.0);
     } else {
-        resultColor = inIdTexture.read(gid);
+        creColor = half4(0.0, 0.0, 0.0, 1.0);
     }
-    
+
+    half4 resultColor = creColor;
+    resultColor = inIdTexture.read(gid).rgba;
+    if (creColor.r == 1.0) {
+        resultColor = half4(creColor.rgb, 1.0);
+    }
+
     outTexture.write(resultColor, gid);
 
 //    half4 inColor = inTexture.read(gid);
 //    outTexture.write(inColor, gid);
 }
+
+kernel void kernel_dilation_func(texture2d<half, access::read> inTexture [[ texture(0) ]],
+                                  texture2d<half, access::write> outTexture [[ texture(1) ]],
+                                  texture2d<half, access::read> inIdTexture [[ texture(2) ]],
+                                  uint2 gid [[thread_position_in_grid]]) {
+    constexpr int size = 3;
+    constexpr int radius = size / 2;
+    half4 color = inTexture.read(gid);
+    
+    for (int j = 0; j < size; ++j)
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            uint2 textureIndex(gid.x + (i - radius), gid.y + (j - radius));
+            half4 in = inTexture.read(textureIndex).rgba;
+            if (in.r == 1.0) {
+                color = half4(1.0, 1.0, 1.0, 1.0);
+            }
+        }
+    }
+    
+    half4 resultColor = color;
+    resultColor = inIdTexture.read(gid).rgba;
+    if (color.r == 1.0) {
+        resultColor = half4(color.rgb, 1.0);
+    }
+
+    outTexture.write(resultColor, gid);
+}
+
+kernel void kernel_erosion_func(texture2d<half, access::read> inTexture [[ texture(0) ]],
+                                texture2d<half, access::write> outTexture [[ texture(1) ]],
+                                texture2d<half, access::read> inIdTexture [[ texture(2) ]],
+                                uint2 gid [[thread_position_in_grid]]) {
+    constexpr int size = 3;
+    constexpr int radius = size / 2;
+    half4 color = inTexture.read(gid);
+
+    for (int j = 0; j < size; ++j)
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            uint2 textureIndex(gid.x + (i - radius), gid.y + (j - radius));
+            half4 in = inTexture.read(textureIndex).rgba;
+            if (in.r == 0.0) {
+                color = half4(0.0, 0.0, 0.0, 1.0);
+            }
+        }
+    }
+    
+    half4 resultColor = color;
+    resultColor = inIdTexture.read(gid).rgba;
+    if (color.r == 1.0) {
+        resultColor = half4(color.rgb, 1.0);
+    }
+    
+    outTexture.write(resultColor, gid);
+}
+
