@@ -9,7 +9,20 @@
 #include <metal_stdlib>
 using namespace metal;
 
-#define lightDirection float3(1, -4, -5)
+//#define lightDirection float3(1, -4, -5)
+struct Light
+{
+    float3 direction;
+    float3 ambientColor;
+    float3 diffuseColor;
+    float3 specularColor;
+};
+constant Light light = {
+    .direction = { 0.13, 0.72, 0.68 },
+    .ambientColor = { 0.05, 0.05, 0.05 },
+    .diffuseColor = { 0.2, 0.2, 0.2 },
+    .specularColor = { 1, 1, 1 }
+};
 
 // Basic Struct to match our Swift type
 // This is what is passed into the Vertex Shader
@@ -41,6 +54,7 @@ struct GBufferOut {
     float4 depth [[color(3)]];
     float4 id [[color(4)]];
     float4 bw [[color(5)]];
+    float4 lambert [[color(6)]];
 };
 
 struct VertexUniforms {
@@ -90,7 +104,6 @@ fragment GBufferOut gBufferFrag(VertexOut in[[stage_in]], texture2d<float> albed
     
     output.albedo = float4(0.0, 0.0, 0.0, 1.0);
     output.normal = float4(in.normal, 1.0);
-//    output.normal = float4(1.0, 1.0, 0.0, 1.0);
     output.position = in.worldPosition;
     
     //    bunny
@@ -102,6 +115,13 @@ fragment GBufferOut gBufferFrag(VertexOut in[[stage_in]], texture2d<float> albed
     output.depth = float4(float3(depth), 1.0);
     output.id = float4(0.64, 0.64, 0.63, 1.0);
     output.bw = float4(1.0, 1.0, 1.0, 1.0);
+    
+    //lambert
+    float3 normal = normalize(in.normal);
+    float3 lightDirection = normalize(light.direction);
+    float diffuseLight = max(0.0, dot(normal, lightDirection));
+    float3 diffuse = light.diffuseColor * diffuseLight;
+    output.lambert = float4(light.ambientColor + diffuse, 1.0);
     
     return output;
 }
@@ -142,16 +162,19 @@ fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]],
                                         texture2d<float> inTexture [[ texture(0) ]],
                                         texture2d<float> idTexture [[ texture(1) ]],
                                         texture2d<float> nijimiTexture [[ texture(2) ]],
-                                        texture2d<float> bwTexture [[ texture(3) ]]
+                                        texture2d<float> bwTexture [[ texture(3) ]],
+                                        texture2d<float> lambertTexture [[ texture(4) ]]
                                         /*, constant TimeUnifrom &time [[buffer(0)]]*/) {
 //    constexpr sampler colorSampler(address::repeat);
 //    float4 color = texture.sample(linear_sampler, vIn.texcoord);
     float intensity = 0.4;
+    float lamintensity = 0.2;
     constexpr sampler linear_sampler(min_filter::linear, mag_filter::linear);
     float4 incolor = inTexture.sample(linear_sampler, vIn.texcoord);
     float4 idcolor = idTexture.sample(linear_sampler, vIn.texcoord);
     float4 nijimicolor = nijimiTexture.sample(linear_sampler, vIn.texcoord);
     float4 bwcolor = bwTexture.sample(linear_sampler, vIn.texcoord);
+    float4 lambertcolor = lambertTexture.sample(linear_sampler, vIn.texcoord);
     float4 resultColor = incolor;
     
 //    if (bwcolor.r == 1.0 && incolor.r == 1.0) {
@@ -160,8 +183,12 @@ fragment float4 basic_fragment_function(VertexOut vIn [[ stage_in ]],
 //        resultColor = float4(idcolor.rgb, 1.0);
 //    }
     
-    if (bwcolor.r == 1.0) {
+    if (bwcolor.r == 1.0 && incolor.r != 1.0) {
         resultColor = intensity * nijimicolor + (1.0 - intensity) * resultColor;
+    }
+
+    if (bwcolor.r == 1.0 && incolor.r != 1.0) {
+        resultColor = lamintensity * lambertcolor + (1.0 - lamintensity) * resultColor;
     }
 
     return float4(resultColor.rgb, incolor.a);
@@ -222,7 +249,7 @@ kernel void kernel_laplacian_func(texture2d<half, access::read> inDepthTexture [
     half4 creColor(creValue, creValue, creValue, 1.0);
     
     half ave = (creColor.r + creColor.g + creColor.b)/3;
-    if (ave > 0.5) {
+    if (ave > 0.35) {
         creColor = half4(1.0, 1.0, 1.0, 1.0);
     } else {
         creColor = half4(0.0, 0.0, 0.0, 1.0);

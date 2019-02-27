@@ -58,6 +58,8 @@ class Renderer: NSObject {
     var gBufferDepthTexture: MTLTexture!
     var gBufferidTexture: MTLTexture!
     var gBufferbwTexture: MTLTexture!
+    var gBufferLambertTexture: MTLTexture!
+    
     var gBufferDepthStencilState: MTLDepthStencilState!
     var gBufferRenderPassDescriptor: MTLRenderPassDescriptor!
     var gBufferRenderPipeline: MTLRenderPipelineState!
@@ -210,6 +212,8 @@ class Renderer: NSObject {
         
         //load model
         let url = URL(string:"file:///Users/hina/Desktop/bunny_normal.obj")
+//        let url = URL(string:"file:///Users/hina/Desktop/teapot.obj")
+//        let url = URL(string:"file:///Users/hina/Desktop/box.obj")
         let allocator = MTKMeshBufferAllocator(device: device)
         let asset = MDLAsset(url: url!, vertexDescriptor: modelDescriptor, bufferAllocator: allocator)
         
@@ -271,6 +275,14 @@ class Renderer: NSObject {
         gBufferbwDescriptor.usage = [.renderTarget, .shaderRead]
         gBufferbwTexture = device.makeTexture(descriptor: gBufferbwDescriptor)
         
+        // Create lambert texture
+        let gBufferLambertDescriptor: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: drawableWidth, height: drawableHeight, mipmapped: false)
+        gBufferLambertDescriptor.sampleCount = 1
+        gBufferLambertDescriptor.storageMode = .private
+        gBufferLambertDescriptor.textureType = .type2D
+        gBufferLambertDescriptor.usage = [.renderTarget, .shaderRead]
+        gBufferLambertTexture = device.makeTexture(descriptor: gBufferLambertDescriptor)
+        
         // Create GBuffer depth stencil texture
         let gBufferDepthStencilDesc: MTLTextureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: MTLPixelFormat.depth32Float_stencil8, width: drawableWidth, height: drawableHeight, mipmapped: false)
         gBufferDepthStencilDesc.sampleCount = 1
@@ -322,6 +334,11 @@ class Renderer: NSObject {
         gBufferRenderPassDescriptor.colorAttachments[5].texture = gBufferbwTexture
         gBufferRenderPassDescriptor.colorAttachments[5].loadAction = .clear
         gBufferRenderPassDescriptor.colorAttachments[5].storeAction = .store
+        // Specify the properties of the third color attachment (our lambert texture)
+        gBufferRenderPassDescriptor.colorAttachments[6].clearColor = MTLClearColorMake(0, 0, 0, 1)
+        gBufferRenderPassDescriptor.colorAttachments[6].texture = gBufferLambertTexture
+        gBufferRenderPassDescriptor.colorAttachments[6].loadAction = .clear
+        gBufferRenderPassDescriptor.colorAttachments[6].storeAction = .store
         // Specify the properties of the depth attachment
         gBufferRenderPassDescriptor.depthAttachment.loadAction = .clear
         gBufferRenderPassDescriptor.depthAttachment.storeAction = .store
@@ -363,7 +380,7 @@ class Renderer: NSObject {
         gBufferRenderPipelineDesc.colorAttachments[3].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[4].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
-//        gBufferRenderPipelineDesc.colorAttachments[5].pixelFormat = .rgba16Float
+        gBufferRenderPipelineDesc.colorAttachments[6].pixelFormat = .rgba16Float
         gBufferRenderPipelineDesc.depthAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.stencilAttachmentPixelFormat = MTLPixelFormat.depth32Float_stencil8
         gBufferRenderPipelineDesc.sampleCount = 1
@@ -531,6 +548,7 @@ extension Renderer: MTKViewDelegate {
         commandEncoder?.setFragmentTexture(gBufferidTexture, index: 1)
         commandEncoder?.setFragmentTexture(texture, index: 2)
         commandEncoder?.setFragmentTexture(gBufferbwTexture, index: 3)
+        commandEncoder?.setFragmentTexture(gBufferLambertTexture, index: 4)
         // Draw primitive at vertexStart 0
         commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 0, vertexCount: vertices.count)
 //        commandEncoder?.drawPrimitives(type: MTLPrimitiveType.triangle, vertexStart: 1, vertexCount: 3)
@@ -549,11 +567,13 @@ extension Renderer: MTKViewDelegate {
 //        let angle = 0
         
         //gbuffer pass
-        gBufferCameraWorldPosition = float3(0, 0.2, 0.5)
+        gBufferCameraWorldPosition = float3(0, 0.2, 0.5) //bunny0.8
+//        gBufferCameraWorldPosition = float3(0, 0, 5) //teapot
+//        gBufferCameraWorldPosition = float3(0, 0, 9) //box
         gBufferViewMatrix = float4x4(translationBy: -gBufferCameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
         gBufferProjectionMatrix = float4x4(perspectiveProjectionFov: Float.pi / 6, aspectRatio: aspectRadio, nearZ: 0.001, farZ: 100)
-        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by: Float(angle)) * float4x4(scaleBy: 2.4)
-        
+        gBufferModelMatrix = float4x4(rotationAbout: float3(0, 1, 0), by:Float(angle)) * float4x4(scaleBy: 2.4)
+    
         //second pass
         cameraWorldPosition = float3(0, 0, 5)
         viewMatrix = float4x4(translationBy: -cameraWorldPosition) * float4x4(rotationAbout: float3(1, 0, 0), by: .pi / 6)
